@@ -23,7 +23,7 @@ estimation than the 2 vs 2 primary contrast.
 |---|---|
 | Genes in raw matrix | 27,179 |
 | Genes after low-count filtering (>=10 counts in >=2 samples) | 15,264 |
-| Genes tested (DESeq2, independent filtering) | 14,968 |
+| Genes with adjusted p-values (after independent filtering) | 14,968 |
 | Significant DE genes (padj < 0.05, \|log2FC\| >= 1) | **1,356** (474 up, 882 down in lactation) |
 | PCA separation | PC1 61.7% + PC2 25.0% variance; replicates cluster tightly |
 
@@ -42,13 +42,19 @@ The same workflow run on the standard DESeq2 benchmark dataset:
 
 | Metric | Value |
 |---|---|
-| Genes tested | 38,587 |
-| Significant (padj < 0.05) | 6,595 |
-| Significant + \|log2FC\| >= 1 | 2,176 (1,096 up, 1,080 down in Dex) |
-| PCA | PC1 (23.3%) separates Dex from untreated across all 4 cell lines |
+| Genes after low-count filter | 26,231 |
+| Genes with adjusted p-values (after independent filtering) | 21,145 |
+| Significant (padj < 0.05) | 4,155 |
+| Significant + \|log2FC\| >= 1 | 1,123 (601 up, 522 down in Dex) |
+| PCA | PC1 (27.2%) separates Dex from untreated across all 4 cell lines |
 
-Top hits are known glucocorticoid-response genes (DUSP1, SPARCL1, MAOA, GPX3,
-SERPINA3), consistent with the original publication and the DESeq2 vignette.
+Top hits are known glucocorticoid-response genes (SPARCL1, SAMHD1, MAOA, DUSP1,
+GPX3, SERPINA3), consistent with the original publication and the DESeq2 vignette
+(top hit by adjusted p-value: SPARCL1, same as the vignette).
+
+| airway PCA | airway volcano |
+|---|---|
+| ![airway PCA](results/airway/pca_plot.png) | ![airway volcano](results/airway/volcano_plot.png) |
 
 ### Exploratory: is the lactation response shared across cell types?
 
@@ -124,6 +130,12 @@ python scripts/08_airway_analysis.py      # downloads are cached in data/
   standard practice is to confirm with a second tool or literature review.
 - Raw counts (never FPKM/TPM) are used for testing, and genes with very low counts
   are pre-filtered, per DESeq2/edgeR standard practice.
+- **airway count conversion:** recount3 gene-level files contain raw base-pair
+  coverage (AUC) counts, not read counts. Script 08 converts them with the
+  recount3 `compute_read_counts()` method: divide each run by its
+  `star.average_mapped_length` from recount3's own QC metadata
+  (`sra.recount_qc.SRP033351.MD.gz`) and round (the official default), before
+  running DESeq2.
 
 ## License
 

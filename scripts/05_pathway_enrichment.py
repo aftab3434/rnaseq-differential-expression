@@ -55,7 +55,8 @@ for ax, df, title, color in [
     ax.scatter(-df["Adjusted P-value"].map(lambda p: __import__("numpy").log10(p)),
                range(len(df)), s=df["Odds Ratio"].clip(upper=15) * 12, color=color, alpha=0.75)
     ax.set_yticks(range(len(df)))
-    ax.set_yticklabels(df["Term"].str.slice(0, 58), fontsize=8)
+    import textwrap
+    ax.set_yticklabels([textwrap.fill(t, 38) for t in df["Term"]], fontsize=8)
     ax.set_xlabel("-log10 adjusted p-value")
     ax.set_title(title)
 fig.suptitle("Pathway enrichment (Enrichr: GO Biological Process + KEGG mouse)")

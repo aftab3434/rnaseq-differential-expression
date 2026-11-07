@@ -74,9 +74,18 @@ z = mat.sub(mat.mean(axis=1), axis=0).div(mat.std(axis=1).replace(0, np.nan), ax
 z.index = [s if s else str(g) for s, g in zip(top50["symbol"], top50.index)]
 
 col_colors = meta["stage"].map({"virgin": "#1f77b4", "pregnant": "#2ca02c", "lactating": "#d62728"})
+# readable column labels: stage + replicate number instead of opaque sample codes
+rep = meta.groupby("stage").cumcount() + 1
+z.columns = [f"{st} {n}" for st, n in zip(meta["stage"], rep)]
 g = sns.clustermap(z, cmap="RdBu_r", center=0, col_cluster=False,
                    col_colors=col_colors, figsize=(8, 10),
                    yticklabels=True, cbar_kws={"label": "row z-score"})
+import matplotlib.patches as mpatches
+handles = [mpatches.Patch(color=c, label=st) for st, c in
+           [("virgin", "#1f77b4"), ("pregnant", "#2ca02c"), ("lactating", "#d62728")]]
+g.ax_heatmap.legend(handles=handles, title="stage", loc="upper left",
+                    bbox_to_anchor=(1.30, 1.0), fontsize=8, title_fontsize=9)
+g.fig.subplots_adjust(right=0.78)
 g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=45, ha="right", fontsize=8)
 g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), fontsize=7)
 g.fig.suptitle("Top 50 DE genes (by adjusted p-value), lactating vs pregnant", y=1.01)

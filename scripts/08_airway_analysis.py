@@ -23,7 +23,7 @@ RANDOM_SEED = 42
 SYMBOLS = {"ENSG00000165995": "CACNB2", "ENSG00000146250": "PRSS35",
            "ENSG00000152583": "SPARCL1", "ENSG00000101347": "SAMHD1",
            "ENSG00000120129": "DUSP1", "ENSG00000189221": "MAOA",
-           "ENSG00000157150": "TIMP4", "ENSG00000211445": "GPX3",
+           "ENSG00000157150": "TIMP4", "ENSG00000211445": "GPX3", "ENSG00000101342": "TLDC2",
            "ENSG00000162692": "VCAM1", "ENSG00000196136": "SERPINA3"}
 PADJ_CUTOFF = 0.05
 LFC_CUTOFF = 1.0
@@ -38,6 +38,32 @@ print("Loading recount3 gene counts ...")
 counts = pd.read_csv(DATA, sep="\t", comment="#", index_col=0)
 counts = counts.T  # samples x genes
 counts.index.name = "run"
+
+# recount3 gene_sums are raw base-pair coverage (AUC) counts, NOT read counts.
+# Convert with the recount3 compute_read_counts() method: divide each sample by
+# its recount3 QC "star.average_mapped_length" and round (round=TRUE is the
+# official default). Per-run mapped lengths from recount3's own QC metadata:
+# https://duffel.rail.bio/recount3/human/data_sources/sra/metadata/51/SRP033351/sra.recount_qc.SRP033351.MD.gz
+AVG_MAPPED_LEN = {
+                "SRR1039508": 124.81,
+                "SRR1039509": 124.8,
+                "SRR1039510": 124.79,
+                "SRR1039511": 124.83,
+                "SRR1039512": 124.9,
+                "SRR1039513": 124.86,
+                "SRR1039514": 124.83,
+                "SRR1039515": 124.86,
+                "SRR1039516": 124.84,
+                "SRR1039517": 124.81,
+                "SRR1039518": 124.81,
+                "SRR1039519": 124.81,
+                "SRR1039520": 124.8,
+                "SRR1039521": 124.8,
+                "SRR1039522": 124.84,
+                "SRR1039523": 124.86
+}
+counts = counts.div(pd.Series(AVG_MAPPED_LEN), axis=0).round().astype(int)
+print("Converted AUC coverage counts to read counts (recount3 compute_read_counts method).")
 
 meta = pd.DataFrame(
     [(run, CELL_LINES[i // 4], TREATMENTS[i % 4]) for i, run in enumerate(counts.index)],
@@ -120,8 +146,14 @@ ax.axvline(LFC_CUTOFF, ls="--", lw=0.8, c="k"); ax.axvline(-LFC_CUTOFF, ls="--",
 SYMBOLS = {"ENSG00000165995": "CACNB2", "ENSG00000146250": "PRSS35",
            "ENSG00000152583": "SPARCL1", "ENSG00000101347": "SAMHD1",
            "ENSG00000120129": "DUSP1", "ENSG00000189221": "MAOA",
-           "ENSG00000157150": "TIMP4", "ENSG00000211445": "GPX3",
+           "ENSG00000157150": "TIMP4", "ENSG00000211445": "GPX3", "ENSG00000101342": "TLDC2",
            "ENSG00000162692": "VCAM1", "ENSG00000196136": "SERPINA3"}
+# greedy non-overlapping label placement
+fig.canvas.draw()
+renderer = fig.canvas.get_renderer()
+placed = []
+OFFSETS = [(6, 6), (6, -14), (-6, 6), (-6, -14), (10, 10), (-10, 10),
+           (10, -20), (-10, -20), (0, 14), (0, -20), (16, 0), (-16, 0)]
 seen = set()
 for g in res.head(10).index:
     base = g.split(".")[0]
@@ -129,8 +161,22 @@ for g in res.head(10).index:
     if lab in seen:
         continue
     seen.add(lab)
-    ax.annotate(lab, (res.loc[g, "log2FoldChange"], -np.log10(res.loc[g, "padj"])),
-                fontsize=7, fontstyle="italic")
+    x, y = res.loc[g, "log2FoldChange"], -np.log10(res.loc[g, "padj"])
+    txt = None
+    for dx, dy in OFFSETS:
+        t = ax.annotate(lab, (x, y), fontsize=7, fontstyle="italic",
+                        xytext=(dx, dy), textcoords="offset points",
+                        ha="left" if dx >= 0 else "right")
+        bb = t.get_window_extent(renderer)
+        if not any(bb.overlaps(p) for p in placed):
+            txt = t
+            break
+        t.remove()
+    if txt is None:
+        txt = ax.annotate(lab, (x, y), fontsize=7, fontstyle="italic",
+                          xytext=(6, 6), textcoords="offset points")
+        bb = txt.get_window_extent(renderer)
+    placed.append(bb)
 ax.set_xlabel("log2 fold change (Dex / untreated)")
 ax.set_ylabel("-log10 adjusted p-value")
 ax.set_title("airway: dexamethasone vs untreated (4 vs 4)")
@@ -144,5 +190,6 @@ Significant FDR<{PADJ_CUTOFF}: {len(sig_fdr_only)}
 Significant + |log2FC|>={LFC_CUTOFF}: {len(sig)} (up {(sig.log2FoldChange>0).sum()}, down {(sig.log2FoldChange<0).sum()})
 PCA: PC1 {pca.explained_variance_ratio_[0]*100:.1f}%, PC2 {pca.explained_variance_ratio_[1]*100:.1f}%
 Top gene (min padj): {SYMBOLS.get(res.index[0].split(".")[0], res.index[0])} (padj={res.padj.iloc[0]:.3g})
+Count conversion: recount3 AUC coverage counts / per-run recount3 QC star.average_mapped_length (compute_read_counts method)
 """)
 print("\nScript 08 done.")
