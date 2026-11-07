@@ -8,7 +8,14 @@ download -> QC -> DESeq2 statistics -> PCA / volcano / heatmap -> pathway enrich
 three stages (virgin, 18.5-day pregnancy, 2-day lactation), 2 replicates each.
 Raw gene-level counts are downloaded directly from GEO.
 
-**Comparison:** lactating vs pregnant luminal cells (2 vs 2 replicates).
+**Primary comparison (prespecified):** lactating vs pregnant **luminal** cells (2 vs 2 replicates).
+
+**Second dataset (better replicated):** the canonical `airway` benchmark -
+[Himes et al. 2014](https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE52778) (GSE52778,
+counts via [recount3](https://rna.recount.bio/), study SRP033351). Human airway smooth
+muscle cells, dexamethasone vs untreated, **4 vs 4 replicates**, design `~ cell_line + treatment`
+(the DESeq2 vignette design). This gives DESeq2 a much better basis for dispersion
+estimation than the 2 vs 2 primary contrast.
 
 ## Results at a glance
 
@@ -29,6 +36,36 @@ biology of the lactation switch:
 - **Down in lactation:** mitotic sister chromatid segregation, spindle checkpoint
   (cells stop dividing and start producing milk)
 
+### Second dataset: airway benchmark (4 vs 4)
+
+The same workflow run on the standard DESeq2 benchmark dataset:
+
+| Metric | Value |
+|---|---|
+| Genes tested | 38,587 |
+| Significant (padj < 0.05) | 6,595 |
+| Significant + \|log2FC\| >= 1 | 2,176 (1,096 up, 1,080 down in Dex) |
+| PCA | PC1 (23.3%) separates Dex from untreated across all 4 cell lines |
+
+Top hits are known glucocorticoid-response genes (DUSP1, SPARCL1, MAOA, GPX3,
+SERPINA3), consistent with the original publication and the DESeq2 vignette.
+
+### Exploratory: is the lactation response shared across cell types?
+
+GSE60450 also contains **basal** cells, so we can ask whether basal cells show the
+same lactating-vs-pregnant changes as luminal cells. Short answer: **largely no.**
+The basal contrast finds its own 3,017 significant genes, but genome-wide
+concordance with the luminal response is weak (Spearman rho = 0.16 across all genes;
+57.9% direction agreement among genes significant in either cell type).
+
+Interpretation: the lactation switch is mostly a **luminal-specific** program -
+luminal cells make milk; basal (myoepithelial) cells have a different job. This is
+an *exploratory* observation from one small study, **not** independent replication
+of the primary contrast and not validation of its effect sizes: both cell types come
+from the same animals (still n = 2 per condition), and a weak correlation does not
+strengthen the primary result. It is included as an honest negative/mixed result
+because it is biologically informative.
+
 | PCA | Volcano |
 |---|---|
 | ![PCA](results/figures/pca_plot.png) | ![Volcano](results/figures/volcano_plot.png) |
@@ -47,9 +84,13 @@ scripts/
   03_differential_expression.py  PyDESeq2: lactating vs pregnant luminal cells
   04_visualizations.py           PCA, volcano plot, top-50 heatmap
   05_pathway_enrichment.py       gseapy/Enrichr ORA: GO BP + KEGG mouse
+  06_basal_replication.py        exploratory: basal lactating vs pregnant contrast
+  07_concordance.py              exploratory: luminal-vs-basal concordance
+  08_airway_analysis.py          second dataset: airway 4v4 Dex vs untreated
 results/
-  figures/             the five plots the pipeline produced
+  figures/             the plots the pipeline produced (GSE60450)
   tables/              full DE results, significant genes, enrichment tables
+  airway/              airway benchmark results (full CSV, significant genes, plots)
 ```
 
 ## How to run
@@ -61,6 +102,9 @@ python scripts/02_qc.py
 python scripts/03_differential_expression.py
 python scripts/04_visualizations.py
 python scripts/05_pathway_enrichment.py   # needs internet (Enrichr API)
+python scripts/06_basal_replication.py
+python scripts/07_concordance.py
+python scripts/08_airway_analysis.py      # downloads are cached in data/
 ```
 
 ## Method notes and honest caveats
@@ -68,10 +112,14 @@ python scripts/05_pathway_enrichment.py   # needs internet (Enrichr API)
 - **Statistics:** [PyDESeq2](https://pydeseq2.readthedocs.io/) (Muzellec et al. 2023,
   *Bioinformatics*), a Python re-implementation of DESeq2 matching its v1.34 defaults.
   Small numeric differences from R DESeq2 are expected and documented by its authors.
-- **Replicates:** this dataset has 2 replicates per group. Benchmark studies
+- **Replicates:** the primary contrast has 2 replicates per group. Benchmark studies
   (e.g. Schurch et al. 2016, *RNA*) show small replicate numbers limit statistical
-  power, so this project demonstrates the analysis skill set rather than making
-  strong new biological claims.
+  power, so the GSE60450 results demonstrate the analysis skill set rather than
+  making strong new biological claims. The airway analysis (4 vs 4) shows the same
+  workflow on a better-replicated, community-standard dataset.
+- **No fishing:** the primary contrast (luminal lactating vs pregnant) was chosen
+  up front from the biology of the dataset. The basal/concordance analyses are
+  labelled exploratory and are not used to prop up the primary result.
 - **Enrichment:** over-representation results are hypotheses for follow-up, not proof;
   standard practice is to confirm with a second tool or literature review.
 - Raw counts (never FPKM/TPM) are used for testing, and genes with very low counts
